@@ -1,0 +1,91 @@
+root@master:~/Kubernetes# kubectl label node worker-01 disktype=ssd
+node/worker-01 labeled
+
+
+root@master:~/Kubernetes# kubectl label node worker-02 disktype=ssd
+node/worker-02 labeled
+
+
+root@master:~/Kubernetes# kubectl get nodes --show-labels
+NAME        STATUS   ROLES                  AGE   VERSION   LABELS
+master      Ready    control-plane,master   29h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=master,kubernetes.io/os=linux,node-role.kubernetes.io/control-plane=,node-role.kubernetes.io/master=,node.kubernetes.io/exclude-from-external-load-balancers=
+worker-01   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,disktype=ssd,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-01,kubernetes.io/os=linux
+worker-02   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,disktype=ssd,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-02,kubernetes.io/os=linux
+
+
+root@master:~/Kubernetes# kubectl create -f nodeanti-affinity-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-7b4cb969f-dk2cb   1/1     Running   0          7s    10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-7b4cb969f-nsgkc   1/1     Running   0          7s    10.32.0.3   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl delete -f nodeanti-affinity-deployment.yaml
+deployment.apps "nginx-deployment" deleted
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS        RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-7b4cb969f-dk2cb   0/1     Terminating   0          51s   <none>      worker-02   <none>           <none>
+nginx-deployment-7b4cb969f-nsgkc   0/1     Terminating   0          51s   10.32.0.3   worker-01   <none>           <none>
+
+
+
+
+root@master:~/Kubernetes# cat nodeanti-affinity1-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.12
+        ports:
+        - containerPort: 80
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: disktype
+                operator: NotIn
+                values:
+                - ssd
+				
+				
+
+root@master:~/Kubernetes# kubectl create -f nodeanti-affinity1-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+nginx-deployment-666d688d4b-2h7f8   0/1     Pending   0          4s    <none>   <none>   <none>           <none>
+nginx-deployment-666d688d4b-fh289   0/1     Pending   0          4s    <none>   <none>   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl label node worker-02 disktype-
+node/worker-02 labeled
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-666d688d4b-2h7f8   1/1     Running   0          82s   10.38.0.3   worker-02   <none>           <none>
+nginx-deployment-666d688d4b-fh289   1/1     Running   0          82s   10.38.0.2   worker-02   <none>           <none>
+
+

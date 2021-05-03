@@ -1,0 +1,187 @@
+kubectl create deployment --image=nginx nginx --dry-run=client -o yaml > nginx-deployment.yaml
+
+kubectl create deployment httpd-frontend --image=httpd:2.4-alpine
+
+
+master / M@ster052021
+worker01 / W@rker052021
+worker02 / W@rker052021
+
+
+
+root@master:/home/master# apt-mark hold kubelet kubeadm kubectl
+kubelet set on hold.
+kubeadm set on hold.
+kubectl set on hold.
+
+
+root@master:/home/master# docker info | grep -i cgroup
+ Cgroup Driver: cgroupfs
+ Cgroup Version: 1
+WARNING: No swap limit support
+WARNING: No blkio weight support
+WARNING: No blkio weight_device support
+
+
+root@master:/home/master# echo "Environment="KUBELET_CGROUP_ARGS=--cgroup-driver=cgroupfs"" >> /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+root@master:/home/master# cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+# Note: This dropin only works with kubeadm and kubelet v1.11+
+[Service]
+Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"
+Environment="KUBELET_CONFIG_ARGS=--config=/var/lib/kubelet/config.yaml"
+# This is a file that "kubeadm init" and "kubeadm join" generates at runtime, populating the KUBELET_KUBEADM_ARGS variable dynamically
+EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
+# This is a file that the user can use for overrides of the kubelet args as a last resort. Preferably, the user should use
+# the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
+EnvironmentFile=-/etc/default/kubelet
+ExecStart=
+ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
+Environment=KUBELET_CGROUP_ARGS=--cgroup-driver=cgroupfs
+
+
+root@master:/home/master# systemctl restart kubelet
+Warning: The unit file, source configuration file or drop-ins of kubelet.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+
+root@master:/home/master# systemctl daemon-reload
+
+
+root@master:/home/master# kubeadm init
+[init] Using Kubernetes version: v1.21.0
+[preflight] Running pre-flight checks
+	[WARNING IsDockerSystemdCheck]: detected "cgroupfs" as the Docker cgroup driver. The recommended driver is "systemd". Please follow the guide at https://kubernetes.io/docs/setup/cri/
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'
+[certs] Using certificateDir folder "/etc/kubernetes/pki"
+[certs] Generating "ca" certificate and key
+[certs] Generating "apiserver" certificate and key
+[certs] apiserver serving cert is signed for DNS names [kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local master] and IPs [10.96.0.1 10.0.0.4]
+[certs] Generating "apiserver-kubelet-client" certificate and key
+[certs] Generating "front-proxy-ca" certificate and key
+[certs] Generating "front-proxy-client" certificate and key
+[certs] Generating "etcd/ca" certificate and key
+[certs] Generating "etcd/server" certificate and key
+[certs] etcd/server serving cert is signed for DNS names [localhost master] and IPs [10.0.0.4 127.0.0.1 ::1]
+[certs] Generating "etcd/peer" certificate and key
+[certs] etcd/peer serving cert is signed for DNS names [localhost master] and IPs [10.0.0.4 127.0.0.1 ::1]
+[certs] Generating "etcd/healthcheck-client" certificate and key
+[certs] Generating "apiserver-etcd-client" certificate and key
+[certs] Generating "sa" key and public key
+[kubeconfig] Using kubeconfig folder "/etc/kubernetes"
+[kubeconfig] Writing "admin.conf" kubeconfig file
+[kubeconfig] Writing "kubelet.conf" kubeconfig file
+[kubeconfig] Writing "controller-manager.conf" kubeconfig file
+[kubeconfig] Writing "scheduler.conf" kubeconfig file
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Starting the kubelet
+[control-plane] Using manifest folder "/etc/kubernetes/manifests"
+[control-plane] Creating static Pod manifest for "kube-apiserver"
+[control-plane] Creating static Pod manifest for "kube-controller-manager"
+[control-plane] Creating static Pod manifest for "kube-scheduler"
+[etcd] Creating static Pod manifest for local etcd in "/etc/kubernetes/manifests"
+[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory "/etc/kubernetes/manifests". This can take up to 4m0s
+[kubelet-check] Initial timeout of 40s passed.
+[apiclient] All control plane components are healthy after 75.503956 seconds
+[upload-config] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+[kubelet] Creating a ConfigMap "kubelet-config-1.21" in namespace kube-system with the configuration for the kubelets in the cluster
+[upload-certs] Skipping phase. Please see --upload-certs
+[mark-control-plane] Marking the node master as control-plane by adding the labels: [node-role.kubernetes.io/master(deprecated) node-role.kubernetes.io/control-plane node.kubernetes.io/exclude-from-external-load-balancers]
+[mark-control-plane] Marking the node master as control-plane by adding the taints [node-role.kubernetes.io/master:NoSchedule]
+[bootstrap-token] Using token: 21bbz0.lpgmcwhs96rpoxrx
+[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles
+[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to get nodes
+[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+[bootstrap-token] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+[bootstrap-token] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
+[bootstrap-token] Creating the "cluster-info" ConfigMap in the "kube-public" namespace
+[kubelet-finalize] Updating "/etc/kubernetes/kubelet.conf" to point to a rotatable kubelet client certificate and key
+[addons] Applied essential addon: CoreDNS
+[addons] Applied essential addon: kube-proxy
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 10.0.0.4:6443 --token 21bbz0.lpgmcwhs96rpoxrx \
+	--discovery-token-ca-cert-hash sha256:14455f4065f58398d1797b81ab909b441b5f7e26e7074c1c97744192351f2a6d
+
+
+
+root@master:/home/master# mkdir -p $HOME/.kube
+root@master:/home/master# sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+root@master:/home/master# sudo chown $(id -u):$(id -g) $HOME/.kube/config
+root@master:/home/master# export KUBECONFIG=$HOME/.kube/config
+
+root@master:/home/master# kubectl get nodes
+NAME        STATUS     ROLES                  AGE     VERSION
+master      NotReady   control-plane,master   24m     v1.21.0
+worker-01   NotReady   <none>                 4m31s   v1.21.0
+worker-02   NotReady   <none>                 3m37s   v1.21.0
+
+
+root@master:/home/master# kubeadm token create --print-join-command
+kubeadm join 10.0.0.4:6443 --token 2vwsr4.msmb31nnnq59waqg --discovery-token-ca-cert-hash sha256:14455f4065f58398d1797b81ab909b441b5f7e26e7074c1c97744192351f2a6d
+
+
+root@master:/home/master# echo 'export KUBECONFIG=$HOME/admin.conf' >> $HOME/.bashrc
+
+root@master:/home/master# kubectl get nodes
+NAME        STATUS     ROLES                  AGE     VERSION
+master      NotReady   control-plane,master   27m     v1.21.0
+worker-01   NotReady   <none>                 7m40s   v1.21.0
+worker-02   NotReady   <none>                 6m46s   v1.21.0
+
+
+root@master:/home/master# kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+serviceaccount/weave-net created
+clusterrole.rbac.authorization.k8s.io/weave-net created
+clusterrolebinding.rbac.authorization.k8s.io/weave-net created
+role.rbac.authorization.k8s.io/weave-net created
+rolebinding.rbac.authorization.k8s.io/weave-net created
+daemonset.apps/weave-net created
+
+
+root@master:/home/master# kubectl version
+Client Version: version.Info{Major:"1", Minor:"21", GitVersion:"v1.21.0", GitCommit:"cb303e613a121a29364f75cc67d3d580833a7479", GitTreeState:"clean", BuildDate:"2021-04-08T16:31:21Z", GoVersion:"go1.16.1", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"21", GitVersion:"v1.21.0", GitCommit:"cb303e613a121a29364f75cc67d3d580833a7479", GitTreeState:"clean", BuildDate:"2021-04-08T16:25:06Z", GoVersion:"go1.16.1", Compiler:"gc", Platform:"linux/amd64"}
+
+
+root@master:/home/master# kubectl get nodes
+NAME        STATUS   ROLES                  AGE    VERSION
+master      Ready    control-plane,master   29m    v1.21.0
+worker-01   Ready    <none>                 10m    v1.21.0
+worker-02   Ready    <none>                 9m8s   v1.21.0
+
+
+root@master:/home/master# kubectl get pods -n kube-system
+NAME                             READY   STATUS    RESTARTS   AGE
+coredns-558bd4d5db-5jz7w         1/1     Running   0          30m
+coredns-558bd4d5db-zvll2         1/1     Running   0          30m
+etcd-master                      1/1     Running   0          31m
+kube-apiserver-master            1/1     Running   0          31m
+kube-controller-manager-master   1/1     Running   0          31m
+kube-proxy-6jvbm                 1/1     Running   0          11m
+kube-proxy-lr6pf                 1/1     Running   0          10m
+kube-proxy-q966z                 1/1     Running   0          30m
+kube-scheduler-master            1/1     Running   0          31m
+weave-net-7wbwz                  2/2     Running   1          2m19s
+weave-net-hz5tt                  2/2     Running   1          2m19s
+weave-net-x9dl8                  2/2     Running   1          2m19s
+
+

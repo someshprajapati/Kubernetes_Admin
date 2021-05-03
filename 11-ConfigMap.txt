@@ -1,0 +1,165 @@
+root@master:~/Kubernetes# cat config-map.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  mydata: hello_world
+
+
+root@master:~/Kubernetes# kubectl create -f config-map.yaml
+configmap/my-config created
+
+
+root@master:~/Kubernetes# kubectl get cm
+NAME               DATA   AGE
+kube-root-ca.crt   1      41h
+my-config          1      2m12s
+
+
+root@master:~/Kubernetes# kubectl describe cm my-config
+Name:         my-config
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+mydata:
+----
+hello_world
+Events:  <none>
+
+
+
+root@master:~/Kubernetes# cat configmap-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cm-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    ports:
+    - containerPort: 80
+    env:
+      - name: cm
+        valueFrom:
+          configMapKeyRef:
+            name: my-config
+            key: mydata
+
+
+root@master:~/Kubernetes# kubectl create -f configmap-pod.yaml
+pod/cm-pod created
+
+
+root@master:~/Kubernetes# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+cm-pod   1/1     Running   0          27s
+
+
+root@master:~/Kubernetes# kubectl exec -it cm-pod printenv
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=cm-pod
+TERM=xterm
+cm=hello_world
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+NGINX_VERSION=1.19.10
+NJS_VERSION=0.5.3
+PKG_RELEASE=1~buster
+HOME=/root
+
+
+
+
+root@master:~/Kubernetes# cat redis-cm.yaml
+apiVersion: v1
+data:
+  redis-config: |
+    maxmemory 2mb
+    maxmemory-policy allkeys-lru
+kind: ConfigMap
+metadata:
+  name: example-redis-config
+  namespace: default
+
+
+root@master:~/Kubernetes# kubectl create -f redis-cm.yaml
+configmap/example-redis-config created
+
+
+root@master:~/Kubernetes# kubectl get configmap
+NAME                   DATA   AGE
+example-redis-config   1      15s
+kube-root-ca.crt       1      42h
+
+
+root@master:~/Kubernetes# cat redis-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redis
+spec:
+  containers:
+  - name: redis
+    image: redis
+    env:
+    - name: MASTER
+      value: "true"
+    ports:
+    - containerPort: 6379
+    resources:
+      limits:
+        cpu: "0.1"
+    volumeMounts:
+    - mountPath: /redis-master-data
+      name: data
+    - mountPath: /redis-master
+      name: config
+  volumes:
+    - name: data
+      emptyDir: {}
+    - name: config
+      configMap:
+        name: example-redis-config
+        items:
+        - key: redis-config
+          path: redis.conf
+
+
+root@master:~/Kubernetes# kubectl create -f redis-pod.yaml
+pod/redis created
+
+
+root@master:~/Kubernetes# kubectl get pods
+NAME    READY   STATUS    RESTARTS   AGE
+redis   1/1     Running   0          5s
+
+
+root@master:~/Kubernetes# kubectl exec -it redis cat /redis-master/redis.conf
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+maxmemory 2mb
+maxmemory-policy allkeys-lru
+
+
+root@master:~/Kubernetes# kubectl delete -f redis-pod.yaml
+pod "redis" deleted
+
+
+root@master:~/Kubernetes# kubectl delete -f redis-cm.yaml
+configmap "example-redis-config" deleted
+
+root@master:~/Kubernetes# kubectl get all
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   42h

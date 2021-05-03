@@ -1,0 +1,273 @@
+root@master:~/Kubernetes# kubectl run pod-with-defaults --image alpine --restart Never -- /bin/sleep 999999
+pod/pod-with-defaults created
+
+root@master:~/Kubernetes# kubectl exec pod-with-defaults id
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+uid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)
+
+
+root@master:~/Kubernetes# cat security-cxt.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: alpine-user-context
+spec:
+  containers:
+  - name: main
+    image: alpine
+    command: ["/bin/sleep", "999999"]
+    securityContext:
+      runAsUser: 405
+	  
+	  
+root@master:~/Kubernetes# kubectl apply -f security-cxt.yaml
+pod/alpine-user-context created
+
+root@master:~/Kubernetes# kubectl exec alpine-user-context id
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+uid=405(guest) gid=100(users)
+
+
+root@master:~/Kubernetes# cat security-cxt-nonroot.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: alpine-nonroot
+spec:
+  containers:
+  - name: main
+    image: alpine
+    command: ["/bin/sleep", "999999"]
+    securityContext:
+      runAsNonRoot: true
+	  
+	  
+root@master:~/Kubernetes# kubectl apply -f security-cxt-nonroot.yaml
+pod/alpine-nonroot created
+
+
+root@master:~/Kubernetes#  kubectl get pods
+NAME                  READY   STATUS                       RESTARTS   AGE
+alpine-nonroot        0/1     CreateContainerConfigError   0          37s
+alpine-user-context   1/1     Running                      0          2m48s
+pod-with-defaults     1/1     Running                      0          5m9s
+
+
+root@master:~/Kubernetes# kubectl describe pods alpine-nonroot|grep -A 15 Events
+Events:
+  Type     Reason     Age                 From               Message
+  ----     ------     ----                ----               -------
+  Normal   Scheduled  2m5s                default-scheduler  Successfully assigned default/alpine-nonroot to worker-02
+  Normal   Pulled     2m3s                kubelet            Successfully pulled image "alpine" in 550.621456ms
+  Normal   Pulled     2m1s                kubelet            Successfully pulled image "alpine" in 608.379819ms
+  Normal   Pulled     107s                kubelet            Successfully pulled image "alpine" in 612.028223ms
+  Normal   Pulled     92s                 kubelet            Successfully pulled image "alpine" in 542.178639ms
+  Normal   Pulled     78s                 kubelet            Successfully pulled image "alpine" in 530.454671ms
+  Normal   Pulled     64s                 kubelet            Successfully pulled image "alpine" in 547.734151ms
+  Normal   Pulled     50s                 kubelet            Successfully pulled image "alpine" in 569.35045ms
+  Warning  Failed     38s (x8 over 2m3s)  kubelet            Error: container has runAsNonRoot and image will run as root (pod: "alpine-nonroot_default(b2aeb6ac-5581-4c78-9fb5-de22b0fcd694)", container: main)
+  Normal   Pulled     38s                 kubelet            Successfully pulled image "alpine" in 550.715189ms
+  Normal   Pulling    28s (x9 over 2m3s)  kubelet            Pulling image "alpine"
+  
+  
+
+
+root@master:~/Kubernetes# cat security-cxt-priv.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-pod
+spec:
+  containers:
+  - name: main
+    image: alpine
+    command: ["/bin/sleep", "999999"]
+    securityContext:
+      privileged: true
+
+
+root@master:~/Kubernetes# kubectl apply -f security-cxt-priv.yaml
+pod/privileged-pod created
+
+
+root@master:~/Kubernetes# kubectl exec privileged-pod id
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+uid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)
+
+
+root@master:~/Kubernetes# kubectl exec -it pod-with-defaults ls /dev
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+core             null             shm              termination-log
+fd               ptmx             stderr           tty
+full             pts              stdin            urandom
+mqueue           random           stdout           zero
+
+
+root@master:~/Kubernetes# kubectl exec -it privileged-pod ls /dev
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+autofs           sg0              tty43            ttyS28
+bsg              sg1              tty44            ttyS29
+btrfs-control    shm              tty45            ttyS3
+core             snapshot         tty46            ttyS30
+cpu_dma_latency  stderr           tty47            ttyS31
+cuse             stdin            tty48            ttyS4
+ecryptfs         stdout           tty49            ttyS5
+fb0              termination-log  tty5             ttyS6
+fd               tty              tty50            ttyS7
+full             tty0             tty51            ttyS8
+fuse             tty1             tty52            ttyS9
+hpet             tty10            tty53            ttyprintk
+hwrng            tty11            tty54            udmabuf
+input            tty12            tty55            uhid
+kmsg             tty13            tty56            uinput
+kvm              tty14            tty57            urandom
+loop-control     tty15            tty58            userio
+loop0            tty16            tty59            vcs
+loop1            tty17            tty6             vcs1
+loop2            tty18            tty60            vcs2
+loop3            tty19            tty61            vcs3
+loop4            tty2             tty62            vcs4
+loop5            tty20            tty63            vcs5
+loop6            tty21            tty7             vcs6
+loop7            tty22            tty8             vcsa
+mapper           tty23            tty9             vcsa1
+mcelog           tty24            ttyS0            vcsa2
+mem              tty25            ttyS1            vcsa3
+mqueue           tty26            ttyS10           vcsa4
+net              tty27            ttyS11           vcsa5
+null             tty28            ttyS12           vcsa6
+nvram            tty29            ttyS13           vcsu
+port             tty3             ttyS14           vcsu1
+ppp              tty30            ttyS15           vcsu2
+psaux            tty31            ttyS16           vcsu3
+ptmx             tty32            ttyS17           vcsu4
+ptp0             tty33            ttyS18           vcsu5
+pts              tty34            ttyS19           vcsu6
+random           tty35            ttyS2            vfio
+rfkill           tty36            ttyS20           vga_arbiter
+rtc0             tty37            ttyS21           vhost-net
+sda              tty38            ttyS22           vhost-vsock
+sda1             tty39            ttyS23           vmbus
+sda14            tty4             ttyS24           zero
+sda15            tty40            ttyS25           zfs
+sdb              tty41            ttyS26
+sdb1             tty42            ttyS27
+
+
+
+root@master:~/Kubernetes# kubectl exec -it pod-with-defaults -- date +%T -s "12:00:00"
+date: can't set date: Operation not permitted
+12:00:00
+
+
+root@master:~/Kubernetes# cat security-cxt-time.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kernelchange-pod
+spec:
+  containers:
+  - name: main
+    image: alpine
+    command: ["/bin/sleep", "999999"]
+    securityContext:
+      capabilities:
+        add:
+        - SYS_TIME
+		
+		
+root@master:~/Kubernetes# kubectl create -f security-cxt-time.yaml
+pod/kernelchange-pod created
+
+
+root@master:~/Kubernetes# kubectl exec -it kernelchange-pod -- date +%T -s "12:00:00"
+12:00:00
+
+
+root@master:~/Kubernetes# cat security-cxt-rmcap.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: remove-capabilities
+spec:
+  containers:
+  - name: main
+    image: alpine
+    command: ["/bin/sleep", "999999"]
+    securityContext:
+      capabilities:
+        drop:
+        - CHOWN
+		
+		
+root@master:~/Kubernetes# kubectl create -f security-cxt-rmcap.yaml
+pod/remove-capabilities created
+
+
+root@master:~/Kubernetes# kubectl exec remove-capabilities chown guest /tmp
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+chown: /tmp: Operation not permitted
+command terminated with exit code 1
+
+
+root@master:~/Kubernetes# cat security-cxt-readonly.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readonly-pod
+spec:
+  containers:
+  - name: main
+    image: alpine
+    command: ["/bin/sleep", "999999"]
+    securityContext:
+      readOnlyRootFilesystem: true
+    volumeMounts:
+    - name: my-volume
+      mountPath: /volume
+      readOnly: false
+  volumes:
+  - name: my-volume
+    emptyDir:
+
+
+root@master:~/Kubernetes# kubectl apply -f security-cxt-readonly.yaml
+pod/readonly-pod created
+
+
+root@master:~/Kubernetes# kubectl exec -it readonly-pod touch /new-file
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+touch: /new-file: Read-only file system
+command terminated with exit code 1
+
+
+root@master:~/Kubernetes# kubectl exec -it readonly-pod touch /volume/new-file
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+
+
+root@master:~/Kubernetes# kubectl exec -it readonly-pod -- ls -la /volume/new-file
+-rw-r--r--    1 root     root             0 May  3 05:21 /volume/new-file
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                      READY   STATUS                       RESTARTS   AGE
+pod/alpine-nonroot        0/1     CreateContainerConfigError   0          19m
+pod/alpine-user-context   1/1     Running                      0          22m
+pod/kernelchange-pod      1/1     Running                      0          11m
+pod/pod-with-defaults     1/1     Running                      0          24m
+pod/privileged-pod        1/1     Running                      0          16m
+pod/readonly-pod          1/1     Running                      0          6m43s
+pod/remove-capabilities   1/1     Running                      0          8m47s
+
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   41h
+
+
+root@master:~/Kubernetes# kubectl delete pod/alpine-nonroot  pod/alpine-user-context pod/kernelchange-pod pod/pod-with-defaults pod/privileged-pod pod/readonly-pod pod/remove-capabilities
+pod "alpine-user-context" deleted
+pod "kernelchange-pod" deleted
+pod "pod-with-defaults" deleted
+pod "privileged-pod" deleted
+pod "readonly-pod" deleted
+pod "remove-capabilities" deleted
+

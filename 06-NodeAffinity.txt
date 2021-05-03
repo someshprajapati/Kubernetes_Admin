@@ -1,0 +1,115 @@
+root@master:~/Kubernetes# cat nodeaffinity-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.12
+        ports:
+        - containerPort: 80
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: disktype
+                operator: In
+                values:
+                - ssd
+				
+				
+
+root@master:~/Kubernetes# kubectl get nodes --show-labels
+NAME        STATUS   ROLES                  AGE   VERSION   LABELS
+master      Ready    control-plane,master   28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=master,kubernetes.io/os=linux,node-role.kubernetes.io/control-plane=,node-role.kubernetes.io/master=,node.kubernetes.io/exclude-from-external-load-balancers=
+worker-01   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-01,kubernetes.io/os=linux
+worker-02   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-02,kubernetes.io/os=linux
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+No resources found in default namespace.
+
+
+root@master:~/Kubernetes# kubectl create -f nodeaffinity-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-7fbd95cd78-6l6tw   1/1     Running   0          5s    10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-7fbd95cd78-jlvmf   1/1     Running   0          5s    10.38.0.2   worker-02   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   2/2     2            2           31s
+
+
+
+
+root@master:~/Kubernetes# cat nodeaffinity1-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.12
+        ports:
+        - containerPort: 80
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: disktype
+                operator: In
+                values:
+                - ssd
+				
+				
+root@master:~/Kubernetes# kubectl create -f nodeaffinity1-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+nginx-deployment-6df5854c8c-sbnkg   0/1     Pending   0          11s   <none>   <none>   <none>           <none>
+nginx-deployment-6df5854c8c-x5c7r   0/1     Pending   0          11s   <none>   <none>   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl label node worker-02 disktype=ssd
+node/worker-02 labeled
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-6df5854c8c-sbnkg   1/1     Running   0          65s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-6df5854c8c-x5c7r   1/1     Running   0          65s   10.38.0.3   worker-02   <none>           <none>
+

@@ -1,0 +1,196 @@
+root@master:~/Kubernetes# kubectl get ns
+NAME              STATUS   AGE
+default           Active   42h
+kube-node-lease   Active   42h
+kube-public       Active   42h
+kube-system       Active   42h
+
+
+root@master:~/Kubernetes# kubectl create namespace quotas
+namespace/quotas created
+
+
+root@master:~/Kubernetes# kubectl get ns
+NAME              STATUS   AGE
+default           Active   42h
+kube-node-lease   Active   42h
+kube-public       Active   42h
+kube-system       Active   42h
+quotas            Active   3s
+
+
+root@master:~/Kubernetes# cat quota.yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota
+  namespace: quotas
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+	
+
+root@master:~/Kubernetes# kubectl create -f quota.yaml
+resourcequota/quota created
+
+
+root@master:~/Kubernetes# kubectl get resourcequota -n quotas
+NAME    AGE   REQUEST                                     LIMIT
+quota   31s   requests.cpu: 0/1, requests.memory: 0/1Gi   limits.cpu: 0/2, limits.memory: 0/2Gi
+
+
+root@master:~/Kubernetes# kubectl describe resourcequota -n quotas
+Name:            quota
+Namespace:       quotas
+Resource         Used  Hard
+--------         ----  ----
+limits.cpu       0     2
+limits.memory    0     2Gi
+requests.cpu     0     1
+requests.memory  0     1Gi
+
+
+
+root@master:~/Kubernetes# cat quota-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quota-pod
+  namespace: quotas
+spec:
+  containers:
+  - name: quota-container
+    image: nginx
+    resources:
+      limits:
+        memory: "800Mi"
+        cpu: "1000m"
+      requests:
+        memory: "600Mi"
+        cpu: "350m"
+
+root@master:~/Kubernetes# kubectl create -f quota-pod.yaml
+pod/quota-pod created
+
+
+root@master:~/Kubernetes# kubectl get pods
+No resources found in default namespace.
+
+root@master:~/Kubernetes# kubectl get pods -n quotas
+NAME        READY   STATUS    RESTARTS   AGE
+quota-pod   1/1     Running   0          12s
+
+
+root@master:~/Kubernetes# kubectl describe resourcequota -n quotas
+Name:            quota
+Namespace:       quotas
+Resource         Used   Hard
+--------         ----   ----
+limits.cpu       1      2
+limits.memory    800Mi  2Gi
+requests.cpu     350m   1
+requests.memory  600Mi  1Gi
+
+
+root@master:~/Kubernetes# kubectl create -f quota-pod1.yaml
+Error from server (Forbidden): error when creating "quota-pod1.yaml": pods "quota-pod1" is forbidden: exceeded quota: quota, requested: requests.memory=600Mi, used: requests.memory=600Mi, limited: requests.memory=1Gi
+
+
+root@master:~/Kubernetes# kubectl describe resourcequota -n quotas
+Name:            quota
+Namespace:       quotas
+Resource         Used   Hard
+--------         ----   ----
+limits.cpu       1      2
+limits.memory    800Mi  2Gi
+requests.cpu     350m   1
+requests.memory  600Mi  1Gi
+
+
+root@master:~/Kubernetes# kubectl get pods -n quotas
+NAME        READY   STATUS    RESTARTS   AGE
+quota-pod   1/1     Running   0          2m49s
+
+
+root@master:~/Kubernetes# kubectl edit resourcequota quota -n quotas
+resourcequota/quota edited
+
+
+root@master:~/Kubernetes# kubectl describe resourcequota -n quotas
+Name:            quota
+Namespace:       quotas
+Resource         Used   Hard
+--------         ----   ----
+limits.cpu       1      2
+limits.memory    800Mi  2Gi
+pods             1      1
+requests.cpu     350m   1
+requests.memory  600Mi  1Gi
+
+
+root@master:~/Kubernetes# vi quota-pod1.yaml
+
+root@master:~/Kubernetes# kubectl create -f quota-pod1.yaml
+Error from server (Forbidden): error when creating "quota-pod1.yaml": pods "quota-pod1" is forbidden: exceeded quota: quota, requested: pods=1, used: pods=1, limited: pods=1
+
+
+root@master:~/Kubernetes# kubectl edit resourcequota quota -n quotas
+resourcequota/quota edited
+
+root@master:~/Kubernetes# kubectl create -f quota-pod1.yaml
+pod/quota-pod1 created
+
+root@master:~/Kubernetes# kubectl describe resourcequota -n quotas
+Name:            quota
+Namespace:       quotas
+Resource         Used    Hard
+--------         ----    ----
+limits.cpu       2       2
+limits.memory    1600Mi  2Gi
+pods             2       2
+requests.cpu     700m    1
+requests.memory  900Mi   1Gi
+
+
+root@master:~/Kubernetes# kubectl get pods
+No resources found in default namespace.
+
+
+root@master:~/Kubernetes# kubectl get pods -n quotas
+NAME         READY   STATUS    RESTARTS   AGE
+quota-pod    1/1     Running   0          9m31s
+quota-pod1   1/1     Running   0          18s
+
+
+root@master:~/Kubernetes# kubectl delete -f quota-pod1.yaml
+pod "quota-pod1" deleted
+
+root@master:~/Kubernetes# kubectl delete -f quota-pod.yaml
+pod "quota-pod" deleted
+
+root@master:~/Kubernetes# kubectl get all -n quotas
+No resources found in quotas namespace.
+
+
+root@master:~/Kubernetes# kubectl get ns
+NAME              STATUS   AGE
+default           Active   42h
+kube-node-lease   Active   42h
+kube-public       Active   42h
+kube-system       Active   42h
+quotas            Active   19m
+
+
+root@master:~/Kubernetes# kubectl delete ns quotas
+namespace "quotas" deleted
+
+
+root@master:~/Kubernetes# kubectl get ns
+NAME              STATUS   AGE
+default           Active   42h
+kube-node-lease   Active   42h
+kube-public       Active   42h
+kube-system       Active   42h

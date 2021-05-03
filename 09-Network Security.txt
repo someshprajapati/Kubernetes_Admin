@@ -1,0 +1,190 @@
+root@master:~# kubectl get nodes
+NAME        STATUS   ROLES                  AGE   VERSION
+master      Ready    control-plane,master   40h   v1.21.0
+worker-01   Ready    <none>                 40h   v1.21.0
+worker-02   Ready    <none>                 40h   v1.21.0
+
+root@master:~# kubectl get pods
+No resources found in default namespace.
+
+
+root@master:~# kubectl run hello-web --labels app=hello --image=gcr.io/google-samples/hello-app:1.0 --port 8080 --expose
+service/hello-web created
+pod/hello-web created
+
+
+root@master:~# kubectl get pods
+NAME        READY   STATUS    RESTARTS   AGE
+hello-web   1/1     Running   0          9s
+
+
+root@master:~# kubectl get svc
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+hello-web    ClusterIP   10.102.197.46   <none>        8080/TCP   45s
+kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP    40h
+
+
+root@master:~/Kubernetes# cat hello-allow-from-foo.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: hello-allow-from-foo
+spec:
+  policyTypes:
+  - Ingress
+  podSelector:
+    matchLabels:
+      app: hello
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: foo
+
+
+root@master:~/Kubernetes# kubectl get networkpolicy
+No resources found in default namespace.
+
+root@master:~/Kubernetes# kubectl create -f hello-allow-from-foo.yaml
+networkpolicy.networking.k8s.io/hello-allow-from-foo created
+
+
+root@master:~/Kubernetes# kubectl get networkpolicy
+NAME                   POD-SELECTOR   AGE
+hello-allow-from-foo   app=hello      9s
+
+
+root@master:~/Kubernetes# kubectl run test-1 -l app=other --image=alpine --restart=Never --rm -i -t
+If you don't see a command prompt, try pressing enter.
+/ # wget -qO- --timeout=2 http://hello-web:8080
+wget: download timed out
+/ # exit
+pod "test-1" deleted
+pod default/test-1 terminated (Error)
+
+
+root@master:~/Kubernetes# kubectl run test-1 -l app=foo --image=alpine --restart=Never --rm -i -t
+If you don't see a command prompt, try pressing enter.
+/ # wget -qO- --timeout=2 http://hello-web:8080
+Hello, world!
+Version: 1.0.0
+Hostname: hello-web
+/ # exit
+pod "test-1" deleted
+
+
+
+
+root@master:~/Kubernetes# cat foo-allow-to-hello.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: foo-allow-to-hello
+spec:
+  policyTypes:
+  - Egress
+  podSelector:
+    matchLabels:
+      app: foo
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: hello
+  - ports:
+    - port: 53
+      protocol: TCP
+    - port: 53
+      protocol: UDP
+	  
+	  
+root@master:~/Kubernetes# kubectl create -f foo-allow-to-hello.yaml
+networkpolicy.networking.k8s.io/foo-allow-to-hello created
+
+
+root@master:~/Kubernetes# kubectl get networkpolicy
+NAME                   POD-SELECTOR   AGE
+foo-allow-to-hello     app=foo        4s
+hello-allow-from-foo   app=hello      6m34s
+
+
+root@master:~/Kubernetes# kubectl describe networkpolicy foo-allow-to-hello
+Name:         foo-allow-to-hello
+Namespace:    default
+Created on:   2021-05-03 04:47:35 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     app=foo
+  Not affecting ingress traffic
+  Allowing egress traffic:
+    To Port: <any> (traffic allowed to all ports)
+    To:
+      PodSelector: app=hello
+    ----------
+    To Port: 53/TCP
+    To Port: 53/UDP
+    To: <any> (traffic not restricted by destination)
+  Policy Types: Egress
+
+
+root@master:~/Kubernetes# kubectl run hello-web-2 --labels app=hello-2 --image=gcr.io/google-samples/hello-app:1.0 --port 8080 --expose
+service/hello-web-2 created
+pod/hello-web-2 created
+
+
+root@master:~/Kubernetes# kubectl run -l app=foo --image=alpine --rm -i -t --restart=Never test-3
+If you don't see a command prompt, try pressing enter.
+/ # wget -qO- --timeout=2 http://hello-web:8080
+Hello, world!
+Version: 1.0.0
+Hostname: hello-web
+/ #
+/ # wget -qO- --timeout=2 http://hello-web-2:8080
+wget: download timed out
+/ #
+/ # exit
+pod "test-3" deleted
+pod default/test-3 terminated (Error)
+
+
+root@master:~/Kubernetes# kubectl delete -f foo-allow-to-hello.yaml
+networkpolicy.networking.k8s.io "foo-allow-to-hello" deleted
+
+
+root@master:~/Kubernetes# kubectl delete -f hello-allow-from-foo.yaml
+networkpolicy.networking.k8s.io "hello-allow-from-foo" deleted
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME              READY   STATUS    RESTARTS   AGE
+pod/hello-web     1/1     Running   0          18m
+pod/hello-web-2   1/1     Running   0          3m25s
+
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/hello-web     ClusterIP   10.102.197.46   <none>        8080/TCP   18m
+service/hello-web-2   ClusterIP   10.111.78.80    <none>        8080/TCP   3m24s
+service/kubernetes    ClusterIP   10.96.0.1       <none>        443/TCP    40h
+
+
+root@master:~/Kubernetes# kubectl delete pod/hello-web pod/hello-web-2
+pod "hello-web" deleted
+pod "hello-web-2" deleted
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/hello-web     ClusterIP   10.102.197.46   <none>        8080/TCP   19m
+service/hello-web-2   ClusterIP   10.111.78.80    <none>        8080/TCP   4m35s
+service/kubernetes    ClusterIP   10.96.0.1       <none>        443/TCP    40h
+
+
+root@master:~/Kubernetes# kubectl delete service/hello-web service/hello-web-2
+service "hello-web" deleted
+service "hello-web-2" deleted
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   40h
+

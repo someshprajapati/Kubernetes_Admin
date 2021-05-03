@@ -1,0 +1,186 @@
+root@master:~# sudo apt-get update && sudo apt-get install -y nfs-kernel-server
+
+root@master:~# sudo mkdir /opt/sfw
+root@master:~# sudo chmod 1777 /opt/sfw/
+
+root@master:~# ls -lrt /opt/
+total 12
+drwx--x--x 4 root root 4096 May  1 11:35 containerd
+drwxr-xr-x 3 root root 4096 May  1 11:43 cni
+drwxrwxrwt 2 root root 4096 May  2 14:07 sfw
+
+root@master:~# echo software > /opt/sfw/hello.txt
+root@master:~# sudo vim /etc/exports
+	/opt/sfw/ *(rw,sync,no_root_squash,subtree_check)
+	
+
+root@master:~# sudo exportfs -ra
+
+root@worker-01:~# sudo apt-get -y install nfs-common
+
+root@worker-02:~# sudo apt-get -y install nfs-common
+
+Use the Master server public IP:
+---------------------
+sudo mount 23.100.24.252:/opt/sfw /mnt
+
+
+root@master:~/Kubernetes# cat nfs-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pvvol-1
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    path: /opt/sfw
+    server: 23.100.24.252
+    readOnly: false
+	
+
+root@master:~/Kubernetes# kubectl create -f nfs-pv.yaml
+persistentvolume/pvvol-1 created
+
+
+root@master:~/Kubernetes# kubectl get pv
+NAME      CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE
+pvvol-1   1Gi        RWX            Retain           Available                                   9s
+
+
+root@master:~/Kubernetes# cat nfs-pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nfs-claim
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Mi
+	  
+
+root@master:~/Kubernetes# kubectl create -f nfs-pvc.yaml
+persistentvolumeclaim/nfs-claim created
+
+root@master:~/Kubernetes# kubectl get pvc
+NAME        STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+nfs-claim   Bound    pvvol-1   1Gi        RWX                           51s
+
+
+
+root@master:~/Kubernetes# cat nfspv-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: www
+  labels:
+    name: www
+spec:
+  containers:
+  - name: www
+    image: nginx:alpine
+    ports:
+      - containerPort: 80
+        name: www
+    volumeMounts:
+      - name: nfs-vol
+        mountPath: /usr/share/nginx/html
+  volumes:
+    - name: nfs-vol
+      persistentVolumeClaim:
+        claimName: nfs-claim
+		
+		
+root@master:~/Kubernetes# kubectl create -f nfspv-pod.yaml
+pod/www created
+
+root@master:~/Kubernetes# kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+www    1/1     Running   0          11s
+
+
+root@master:~/Kubernetes# kubectl describe pods www
+Name:         www
+Namespace:    default
+Priority:     0
+Node:         worker-01/10.1.0.4
+Start Time:   Sun, 02 May 2021 14:35:00 +0000
+Labels:       name=www
+Annotations:  <none>
+Status:       Running
+IP:           10.32.0.3
+IPs:
+  IP:  10.32.0.3
+Containers:
+  www:
+    Container ID:   docker://34d640c9bb9c0ba30fd5036fcc3ccaed36e2ea7a265997d4bb8125514634fdac
+    Image:          nginx:alpine
+    Image ID:       docker-pullable://nginx@sha256:07ab71a2c8e4ecb19a5a5abcfb3a4f175946c001c8af288b1aa766d67b0d05d2
+    Port:           80/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Sun, 02 May 2021 14:35:05 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /usr/share/nginx/html from nfs-vol (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-gf2fm (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             True
+  ContainersReady   True
+  PodScheduled      True
+Volumes:
+  nfs-vol:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  nfs-claim
+    ReadOnly:   false
+  kube-api-access-gf2fm:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  30s   default-scheduler  Successfully assigned default/www to worker-01
+  Normal  Pulling    29s   kubelet            Pulling image "nginx:alpine"
+  Normal  Pulled     27s   kubelet            Successfully pulled image "nginx:alpine" in 2.649602817s
+  Normal  Created    26s   kubelet            Created container www
+  Normal  Started    26s   kubelet            Started container www
+  
+  
+root@master:~/Kubernetes# kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+www    1/1     Running   0          3m35s
+
+
+root@master:~/Kubernetes# kubectl delete -f nfspv-pod.yaml
+pod "www" deleted
+
+root@master:~/Kubernetes# kubectl get pods
+No resources found in default namespace.
+
+
+root@master:~/Kubernetes# kubectl delete -f nfs-pvc.yaml
+persistentvolumeclaim "nfs-claim" deleted
+
+
+root@master:~/Kubernetes# kubectl delete -f nfs-pv.yaml
+persistentvolume "pvvol-1" deleted
+
+
+root@master:~/Kubernetes# kubectl get pv
+No resources found

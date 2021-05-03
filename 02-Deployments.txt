@@ -1,0 +1,356 @@
+root@master:~/Kubernetes# kubectl create -f nginx-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   0/2     2            0           6s
+
+
+root@master:~/Kubernetes# kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   2/2     2            2           29s
+
+
+root@master:~/Kubernetes# kubectl get pods
+NAME                               READY   STATUS    RESTARTS   AGE
+nginx-deployment-f77774fc5-gxlnc   1/1     Running   0          26s
+nginx-deployment-f77774fc5-mc4g9   1/1     Running   0          26s
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                                   READY   STATUS    RESTARTS   AGE
+pod/nginx-deployment-f77774fc5-gxlnc   1/1     Running   0          2m32s
+pod/nginx-deployment-f77774fc5-mc4g9   1/1     Running   0          2m32s
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/demo-pod     NodePort    10.99.229.40   <none>        80:30504/TCP   19m
+service/kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        23h
+
+NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-deployment   2/2     2            2           2m32s
+
+NAME                                         DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-deployment-f77774fc5   2         2         2       2m32s
+
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-gxlnc   1/1     Running   0          4m    10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-mc4g9   1/1     Running   0          4m    10.38.0.2   worker-02   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl scale --replicas=5 deployment nginx-deployment
+deployment.apps/nginx-deployment scaled
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-5msmk   1/1     Running   0          16s     10.38.0.3   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-d8s4k   1/1     Running   0          16s     10.32.0.5   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-gxlnc   1/1     Running   0          5m19s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-mc4g9   1/1     Running   0          5m19s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-ppktk   1/1     Running   0          16s     10.32.0.4   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl describe deployment nginx-deployment
+Name:                   nginx-deployment
+Namespace:              default
+CreationTimestamp:      Sun, 02 May 2021 11:28:17 +0000
+Labels:                 app=nginx
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=nginx
+Replicas:               5 desired | 5 updated | 5 total | 5 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=nginx
+  Containers:
+   nginx:
+    Image:        nginx:1.12
+    Port:         80/TCP
+    Host Port:    0/TCP
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Progressing    True    NewReplicaSetAvailable
+  Available      True    MinimumReplicasAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   nginx-deployment-f77774fc5 (5/5 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  6m1s  deployment-controller  Scaled up replica set nginx-deployment-f77774fc5 to 2
+  Normal  ScalingReplicaSet  58s   deployment-controller  Scaled up replica set nginx-deployment-f77774fc5 to 5
+  
+  
+  
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE    IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-5msmk   1/1     Running   0          2m6s   10.38.0.3   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-d8s4k   1/1     Running   0          2m6s   10.32.0.5   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-gxlnc   1/1     Running   0          7m9s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-mc4g9   1/1     Running   0          7m9s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-ppktk   1/1     Running   0          2m6s   10.32.0.4   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl delete pod nginx-deployment-f77774fc5-5msmk
+pod "nginx-deployment-f77774fc5-5msmk" deleted
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-d8s4k   1/1     Running   0          2m31s   10.32.0.5   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-gxlnc   1/1     Running   0          7m34s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-mc4g9   1/1     Running   0          7m34s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-ppktk   1/1     Running   0          2m31s   10.32.0.4   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-vbjr7   1/1     Running   0          5s      10.38.0.3   worker-02   <none>           <none>
+
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                                   READY   STATUS    RESTARTS   AGE
+pod/nginx-deployment-f77774fc5-d8s4k   1/1     Running   0          3m45s
+pod/nginx-deployment-f77774fc5-gxlnc   1/1     Running   0          8m48s
+pod/nginx-deployment-f77774fc5-mc4g9   1/1     Running   0          8m48s
+pod/nginx-deployment-f77774fc5-ppktk   1/1     Running   0          3m45s
+pod/nginx-deployment-f77774fc5-vbjr7   1/1     Running   0          79s
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/demo-pod     NodePort    10.99.229.40   <none>        80:30504/TCP   25m
+service/kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        23h
+
+NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-deployment   5/5     5            5           8m48s
+
+NAME                                         DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-deployment-f77774fc5   5         5         5       8m48s
+
+
+root@master:~/Kubernetes# kubectl set image deployment/nginx-deployment nginx=nginx:1.17.0
+deployment.apps/nginx-deployment image updated
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                                    READY   STATUS              RESTARTS   AGE
+pod/nginx-deployment-56fdbbbdc8-4s2gm   0/1     ContainerCreating   0          7s
+pod/nginx-deployment-56fdbbbdc8-k4qtn   0/1     ContainerCreating   0          7s
+pod/nginx-deployment-56fdbbbdc8-pb5xt   0/1     ContainerCreating   0          7s
+pod/nginx-deployment-f77774fc5-gxlnc    1/1     Running             0          10m
+pod/nginx-deployment-f77774fc5-mc4g9    1/1     Running             0          10m
+pod/nginx-deployment-f77774fc5-ppktk    1/1     Running             0          5m7s
+pod/nginx-deployment-f77774fc5-vbjr7    1/1     Running             0          2m41s
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/demo-pod     NodePort    10.99.229.40   <none>        80:30504/TCP   26m
+service/kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        23h
+
+NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-deployment   4/5     3            4           10m
+
+NAME                                          DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-deployment-56fdbbbdc8   3         3         0       7s
+replicaset.apps/nginx-deployment-f77774fc5    4         4         4       10m
+
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/nginx-deployment-56fdbbbdc8-4rnt2   1/1     Running   0          17s
+pod/nginx-deployment-56fdbbbdc8-4s2gm   1/1     Running   0          26s
+pod/nginx-deployment-56fdbbbdc8-k4qtn   1/1     Running   0          26s
+pod/nginx-deployment-56fdbbbdc8-pb5xt   1/1     Running   0          26s
+pod/nginx-deployment-56fdbbbdc8-zrgds   1/1     Running   0          17s
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/demo-pod     NodePort    10.99.229.40   <none>        80:30504/TCP   26m
+service/kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        23h
+
+NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-deployment   5/5     5            5           10m
+
+NAME                                          DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-deployment-56fdbbbdc8   5         5         5       26s
+replicaset.apps/nginx-deployment-f77774fc5    0         0         0       10m
+
+
+
+root@master:~/Kubernetes# kubectl describe deployment nginx-deployment
+Name:                   nginx-deployment
+Namespace:              default
+CreationTimestamp:      Sun, 02 May 2021 11:28:17 +0000
+Labels:                 app=nginx
+Annotations:            deployment.kubernetes.io/revision: 2
+Selector:               app=nginx
+Replicas:               5 desired | 5 updated | 5 total | 5 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=nginx
+  Containers:
+   nginx:
+    Image:        nginx:1.17.0
+    Port:         80/TCP
+    Host Port:    0/TCP
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   nginx-deployment-56fdbbbdc8 (5/5 replicas created)
+Events:
+  Type    Reason             Age                 From                   Message
+  ----    ------             ----                ----                   -------
+  Normal  ScalingReplicaSet  11m                 deployment-controller  Scaled up replica set nginx-deployment-f77774fc5 to 2
+  Normal  ScalingReplicaSet  6m50s               deployment-controller  Scaled up replica set nginx-deployment-f77774fc5 to 5
+  Normal  ScalingReplicaSet  110s                deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 2
+  Normal  ScalingReplicaSet  110s                deployment-controller  Scaled down replica set nginx-deployment-f77774fc5 to 4
+  Normal  ScalingReplicaSet  110s                deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 3
+  Normal  ScalingReplicaSet  101s                deployment-controller  Scaled down replica set nginx-deployment-f77774fc5 to 3
+  Normal  ScalingReplicaSet  101s                deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 4
+  Normal  ScalingReplicaSet  101s                deployment-controller  Scaled down replica set nginx-deployment-f77774fc5 to 2
+  Normal  ScalingReplicaSet  101s                deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 5
+  Normal  ScalingReplicaSet  99s (x2 over 100s)  deployment-controller  (combined from similar events): Scaled down replica set nginx-deployment-f77774fc5 to 0
+  
+  
+
+root@master:~/Kubernetes# kubectl rollout history deployment nginx-deployment
+deployment.apps/nginx-deployment
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+
+root@master:~/Kubernetes# kubectl rollout undo deployment nginx-deployment --to-revision=1
+deployment.apps/nginx-deployment rolled back
+
+
+root@master:~/Kubernetes# kubectl describe deployment nginx-deployment
+Name:                   nginx-deployment
+Namespace:              default
+CreationTimestamp:      Sun, 02 May 2021 11:28:17 +0000
+Labels:                 app=nginx
+Annotations:            deployment.kubernetes.io/revision: 3
+Selector:               app=nginx
+Replicas:               5 desired | 5 updated | 5 total | 5 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=nginx
+  Containers:
+   nginx:
+    Image:        nginx:1.12
+    Port:         80/TCP
+    Host Port:    0/TCP
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   nginx-deployment-f77774fc5 (5/5 replicas created)
+Events:
+  Type    Reason             Age                   From                   Message
+  ----    ------             ----                  ----                   -------
+  Normal  ScalingReplicaSet  10m                   deployment-controller  Scaled up replica set nginx-deployment-f77774fc5 to 5
+  Normal  ScalingReplicaSet  5m7s                  deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 2
+  Normal  ScalingReplicaSet  5m7s                  deployment-controller  Scaled down replica set nginx-deployment-f77774fc5 to 4
+  Normal  ScalingReplicaSet  5m7s                  deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 3
+  Normal  ScalingReplicaSet  4m58s                 deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 4
+  Normal  ScalingReplicaSet  4m58s                 deployment-controller  Scaled down replica set nginx-deployment-f77774fc5 to 3
+  Normal  ScalingReplicaSet  4m58s                 deployment-controller  Scaled down replica set nginx-deployment-f77774fc5 to 2
+  Normal  ScalingReplicaSet  4m58s                 deployment-controller  Scaled up replica set nginx-deployment-56fdbbbdc8 to 5
+  Normal  ScalingReplicaSet  14s (x2 over 15m)     deployment-controller  Scaled up replica set nginx-deployment-f77774fc5 to 2
+  Normal  ScalingReplicaSet  10s (x10 over 4m57s)  deployment-controller  (combined from similar events): Scaled down replica set nginx-deployment-56fdbbbdc8 to 0
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                                   READY   STATUS    RESTARTS   AGE
+pod/nginx-deployment-f77774fc5-59c7n   1/1     Running   0          44s
+pod/nginx-deployment-f77774fc5-9z77v   1/1     Running   0          44s
+pod/nginx-deployment-f77774fc5-gwcm9   1/1     Running   0          41s
+pod/nginx-deployment-f77774fc5-pnll7   1/1     Running   0          41s
+pod/nginx-deployment-f77774fc5-stkqp   1/1     Running   0          43s
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/demo-pod     NodePort    10.99.229.40   <none>        80:30504/TCP   32m
+service/kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        23h
+
+NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-deployment   5/5     5            5           15m
+
+NAME                                          DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-deployment-56fdbbbdc8   0         0         0       5m37s
+replicaset.apps/nginx-deployment-f77774fc5    5         5         5       15m
+
+
+
+root@master:~/Kubernetes# kubectl expose deployment nginx-deployment --port 80 --target-port 80 --type ClusterIP
+service/nginx-deployment exposed
+
+
+root@master:~/Kubernetes# kubectl get svc
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+demo-pod           NodePort    10.99.229.40    <none>        80:30504/TCP   34m
+kubernetes         ClusterIP   10.96.0.1       <none>        443/TCP        23h
+nginx-deployment   ClusterIP   10.101.16.231   <none>        80/TCP         6s
+
+
+root@master:~/Kubernetes# kubectl describe svc nginx-deployment
+Name:              nginx-deployment
+Namespace:         default
+Labels:            app=nginx
+Annotations:       <none>
+Selector:          app=nginx
+Type:              ClusterIP
+IP Family Policy:  SingleStack
+IP Families:       IPv4
+IP:                10.101.16.231
+IPs:               10.101.16.231
+Port:              <unset>  80/TCP
+TargetPort:        80/TCP
+Endpoints:         10.32.0.3:80,10.32.0.4:80,10.32.0.6:80 + 2 more...
+Session Affinity:  None
+Events:            <none>
+root@master:~/Kubernetes#
+root@master:~/Kubernetes# curl 10.101.16.231
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+
+

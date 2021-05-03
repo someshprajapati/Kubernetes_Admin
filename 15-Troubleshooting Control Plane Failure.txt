@@ -1,0 +1,368 @@
+root@master:~/Kubernetes# vi /etc/hosts
+127.0.0.1 localhost
+10.1.0.4 worker-01
+10.1.0.5 worker-02
+
+
+root@master:~/Kubernetes# cat script.sh
+#!/bin/bash
+
+read -p "Enter the worker1 username : " w1
+
+read -p "Enter the worker2 username : " w2
+
+
+kubectl get nodes | grep -v master | grep -v NAME | head -n 1 | awk '{print $1}' > node1
+
+kubectl get nodes | grep -v master | tail -n 1 | awk '{print $1}' > node2
+
+
+n1=$(cat node1)
+
+n2=$(cat node2)
+
+
+ssh $w1@$n1 "sudo systemctl stop docker"
+
+ssh $w2@$n2 "sudo systemctl stop kubelet"
+
+
+
+root@master:~/Kubernetes# ./script.sh
+Enter the worker1 username : worker01
+Enter the worker2 username : worker02
+worker01@worker-01's password:
+Warning: Stopping docker.service, but it can still be activated by:
+  docker.socket
+worker02@worker-02's password:
+
+
+--->	root@worker-01:~# sudo systemctl stop docker.socket
+
+
+root@master:~/Kubernetes# kubectl get pods
+No resources found in default namespace.
+
+
+root@master:~/Kubernetes# kubectl run http --image httpd:3.4
+pod/http created
+
+root@master:~/Kubernetes# kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+http   0/1     Pending   0          4s
+
+
+root@master:~/Kubernetes# kubectl describe pods http | grep -A 7 Events
+Events:
+  Type     Reason            Age                 From               Message
+  ----     ------            ----                ----               -------
+  Warning  FailedScheduling  45s (x3 over 2m1s)  default-scheduler  0/3 nodes are available: 1 node(s) had taint {node-role.kubernetes.io/master: }, that the pod didn't tolerate, 1 node(s) had taint {node.kubernetes.io/not-ready: }, that the pod didn't tolerate, 1 node(s) had taint {node.kubernetes.io/unreachable: }, that the pod didn't tolerate.
+  
+  
+ 
+root@master:~/Kubernetes# kubectl get events|grep http
+21s         Normal    Scheduled                 pod/http                                Successfully assigned default/http to worker-01
+27s         Warning   FailedScheduling          pod/http                                0/3 nodes are available: 1 node(s) had taint {node-role.kubernetes.io/master: }, that the pod didn't tolerate, 1 node(s) had taint {node.kubernetes.io/not-ready: }, that the pod didn't tolerate, 1 node(s) had taint {node.kubernetes.io/unreachable: }, that the pod didn't tolerate.
+
+
+
+root@master:~/Kubernetes# kubectl get nodes
+NAME        STATUS     ROLES                  AGE   VERSION
+master      Ready      control-plane,master   45h   v1.21.0
+worker-01   NotReady   <none>                 45h   v1.21.0
+worker-02   NotReady   <none>                 45h   v1.21.0
+
+
+
+root@master:~/Kubernetes# kubectl describe node worker-01
+Name:               worker-01
+Roles:              <none>
+Labels:             beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/os=linux
+                    disktype=ssd
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=worker-01
+                    kubernetes.io/os=linux
+Annotations:        kubeadm.alpha.kubernetes.io/cri-socket: /var/run/dockershim.sock
+                    node.alpha.kubernetes.io/ttl: 0
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Sat, 01 May 2021 12:18:52 +0000
+Taints:             node.kubernetes.io/not-ready:NoExecute
+                    node.kubernetes.io/not-ready:NoSchedule
+Unschedulable:      false
+Lease:
+  HolderIdentity:  worker-01
+  AcquireTime:     <unset>
+  RenewTime:       Mon, 03 May 2021 09:43:03 +0000
+Conditions:
+  Type                 Status  LastHeartbeatTime                 LastTransitionTime                Reason                       Message
+  ----                 ------  -----------------                 ------------------                ------                       -------
+  NetworkUnavailable   False   Mon, 03 May 2021 09:36:39 +0000   Mon, 03 May 2021 09:36:39 +0000   WeaveIsUp                    Weave pod has set this
+  MemoryPressure       False   Mon, 03 May 2021 09:42:57 +0000   Mon, 03 May 2021 09:31:40 +0000   KubeletHasSufficientMemory   kubelet has sufficient memory available
+  DiskPressure         False   Mon, 03 May 2021 09:42:57 +0000   Mon, 03 May 2021 09:31:40 +0000   KubeletHasNoDiskPressure     kubelet has no disk pressure
+  PIDPressure          False   Mon, 03 May 2021 09:42:57 +0000   Mon, 03 May 2021 09:31:40 +0000   KubeletHasSufficientPID      kubelet has sufficient PID available
+  Ready                False   Mon, 03 May 2021 09:42:57 +0000   Mon, 03 May 2021 09:38:05 +0000   KubeletNotReady              [container runtime is down, PLEG is not healthy: pleg was last seen active 5m12.575395728s ago; threshold is 3m0s, container runtime not ready: RuntimeReady=false reason:DockerDaemonNotReady message:docker: failed to get docker version: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?]
+Addresses:
+  InternalIP:  10.1.0.4
+  Hostname:    worker-01
+Capacity:
+  cpu:                2
+  ephemeral-storage:  30309264Ki
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             8153436Ki
+  pods:               110
+Allocatable:
+  cpu:                2
+  ephemeral-storage:  27933017657
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             8051036Ki
+  pods:               110
+System Info:
+  Machine ID:                 74213d709bb94162964b1de682445e5d
+  System UUID:                599d8a7c-960b-384e-b4e3-3bc297188733
+  Boot ID:                    f5c7c053-546b-4428-aba6-0b77f38f6547
+  Kernel Version:             5.4.0-1046-azure
+  OS Image:                   Ubuntu 18.04.5 LTS
+  Operating System:           linux
+  Architecture:               amd64
+  Container Runtime Version:  docker://Unknown
+  Kubelet Version:            v1.21.0
+  Kube-Proxy Version:         v1.21.0
+Non-terminated Pods:          (4 in total)
+  Namespace                   Name                        CPU Requests  CPU Limits  Memory Requests  Memory Limits  Age
+  ---------                   ----                        ------------  ----------  ---------------  -------------  ---
+  kube-system                 coredns-558bd4d5db-v652t    100m (5%)     0 (0%)      70Mi (0%)        170Mi (2%)     50m
+  kube-system                 coredns-558bd4d5db-zvll2    100m (5%)     0 (0%)      70Mi (0%)        170Mi (2%)     45h
+  kube-system                 kube-proxy-6jvbm            0 (0%)        0 (0%)      0 (0%)           0 (0%)         45h
+  kube-system                 weave-net-hz5tt             100m (5%)     0 (0%)      200Mi (2%)       0 (0%)         45h
+Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests    Limits
+  --------           --------    ------
+  cpu                300m (15%)  0 (0%)
+  memory             340Mi (4%)  340Mi (4%)
+  ephemeral-storage  0 (0%)      0 (0%)
+  hugepages-1Gi      0 (0%)      0 (0%)
+  hugepages-2Mi      0 (0%)      0 (0%)
+Events:
+  Type     Reason                   Age                  From        Message
+  ----     ------                   ----                 ----        -------
+  Normal   Starting                 26m                  kube-proxy  Starting kube-proxy.
+  Normal   Starting                 11m                  kubelet     Starting kubelet.
+  Normal   NodeAllocatableEnforced  11m                  kubelet     Updated Node Allocatable limit across pods
+  Normal   NodeHasSufficientMemory  11m (x2 over 11m)    kubelet     Node worker-01 status is now: NodeHasSufficientMemory
+  Normal   NodeHasNoDiskPressure    11m (x2 over 11m)    kubelet     Node worker-01 status is now: NodeHasNoDiskPressure
+  Normal   NodeHasSufficientPID     11m (x2 over 11m)    kubelet     Node worker-01 status is now: NodeHasSufficientPID
+  Normal   NodeReady                11m                  kubelet     Node worker-01 status is now: NodeReady
+  Normal   Starting                 11m                  kube-proxy  Starting kube-proxy.
+  Normal   Starting                 6m30s                kube-proxy  Starting kube-proxy.
+  Normal   NodeNotReady             5m1s                 kubelet     Node worker-01 status is now: NodeNotReady
+  Warning  ContainerGCFailed        23s (x5 over 4m23s)  kubelet     rpc error: code = Unknown desc = Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
+  
+  
+ 
+root@worker-01:~# systemctl status docker |grep Active
+   Active: inactive (dead) since Mon 2021-05-03 09:37:54 UTC; 7min ago
+   
+root@worker-01:~# systemctl status kubelet|grep Active
+   Active: active (running) since Mon 2021-05-03 09:31:38 UTC; 13min ago
+
+root@worker-01:~# systemctl start docker
+
+root@worker-01:~# systemctl status docker |grep Active
+   Active: active (running) since Mon 2021-05-03 09:45:40 UTC; 5s ago
+   
+   
+root@master:~/Kubernetes# kubectl get nodes
+NAME        STATUS     ROLES                  AGE   VERSION
+master      Ready      control-plane,master   45h   v1.21.0
+worker-01   Ready      <none>                 45h   v1.21.0
+worker-02   NotReady   <none>                 45h   v1.21.0
+
+
+root@master:~/Kubernetes# kubectl run http --image httpd:3.4
+pod/http created
+
+
+root@master:~/Kubernetes# kubectl get pods
+NAME   READY   STATUS         RESTARTS   AGE
+http   0/1     ErrImagePull   0          3s
+
+
+root@master:~/Kubernetes# kubectl logs http
+Error from server (BadRequest): container "http" in pod "http" is waiting to start: image can't be pulled
+
+
+root@master:~/Kubernetes# docker search httpd
+NAME                                    DESCRIPTION                                     STARS     OFFICIAL   AUTOMATED
+httpd                                   The Apache HTTP Server Project                  3482      [OK]
+centos/httpd-24-centos7                 Platform for running Apache httpd 2.4 or bui…   39
+centos/httpd                                                                            33                   [OK]
+polinux/httpd-php                       Apache with PHP in Docker (Supervisor, CentO…   4                    [OK]
+salim1983hoop/httpd24                   Dockerfile running apache config                2                    [OK]
+publici/httpd                           httpd:latest                                    1                    [OK]
+manageiq/httpd                          Container with httpd, built on CentOS for Ma…   1                    [OK]
+solsson/httpd-openidc                   mod_auth_openidc on official httpd image, ve…   1                    [OK]
+inanimate/httpd-ssl                     A play container with httpd, ssl enabled, an…   1                    [OK]
+hypoport/httpd-cgi                      httpd-cgi                                       1                    [OK]
+dockerpinata/httpd                                                                      1
+dariko/httpd-rproxy-ldap                Apache httpd reverse proxy with LDAP authent…   1                    [OK]
+clearlinux/httpd                        httpd HyperText Transfer Protocol (HTTP) ser…   1
+lead4good/httpd-fpm                     httpd server which connects via fcgi proxy h…   1                    [OK]
+jonathanheilmann/httpd-alpine-rewrite   httpd:alpine with enabled mod_rewrite           1                    [OK]
+appertly/httpd                          Customized Apache HTTPD that uses a PHP-FPM …   0                    [OK]
+amd64/httpd                             The Apache HTTP Server Project                  0
+centos/httpd-24-centos8                                                                 0
+interlutions/httpd                      httpd docker image with debian-based config …   0                    [OK]
+manasip/httpd                                                                           0
+manageiq/httpd_configmap_generator      Httpd Configmap Generator                       0                    [OK]
+trollin/httpd                                                                           0
+ysli/httpd                              Httpd for DeepWeb                               0                    [OK]
+itsziget/httpd24                        Extended HTTPD Docker image based on the off…   0                    [OK]
+e2eteam/httpd                                                                           0
+
+
+root@master:~/Kubernetes# kubectl run httpcentos --image centos/httpd
+pod/httpcentos created
+
+
+root@master:~/Kubernetes# kubectl get pods
+NAME         READY   STATUS              RESTARTS   AGE
+http         0/1     ImagePullBackOff    0          5m7s
+httpcentos   0/1     ContainerCreating   0          10s
+
+
+root@master:~/Kubernetes# kubectl get pods -w
+NAME         READY   STATUS             RESTARTS   AGE
+http         0/1     ImagePullBackOff   0          5m15s
+httpcentos   1/1     Running            0          18s
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME         READY   STATUS             RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+http         0/1     ImagePullBackOff   0          5m48s   10.32.0.2   worker-01   <none>           <none>
+httpcentos   1/1     Running            0          51s     10.32.0.3   worker-01   <none>           <none>
+
+
+
+root@master:~/Kubernetes# kubectl describe node worker-02
+Name:               worker-02
+Roles:              <none>
+Labels:             beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/os=linux
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=worker-02
+                    kubernetes.io/os=linux
+Annotations:        kubeadm.alpha.kubernetes.io/cri-socket: /var/run/dockershim.sock
+                    node.alpha.kubernetes.io/ttl: 0
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Sat, 01 May 2021 12:19:46 +0000
+Taints:             node.kubernetes.io/unreachable:NoExecute
+                    node.kubernetes.io/unreachable:NoSchedule
+Unschedulable:      false
+Lease:
+  HolderIdentity:  worker-02
+  AcquireTime:     <unset>
+  RenewTime:       Mon, 03 May 2021 09:36:28 +0000
+Conditions:
+  Type                 Status    LastHeartbeatTime                 LastTransitionTime                Reason              Message
+  ----                 ------    -----------------                 ------------------                ------              -------
+  NetworkUnavailable   False     Mon, 03 May 2021 09:33:54 +0000   Mon, 03 May 2021 09:33:54 +0000   WeaveIsUp           Weave pod has set this
+  MemoryPressure       Unknown   Mon, 03 May 2021 09:33:58 +0000   Mon, 03 May 2021 09:37:12 +0000   NodeStatusUnknown   Kubelet stopped posting node status.
+  DiskPressure         Unknown   Mon, 03 May 2021 09:33:58 +0000   Mon, 03 May 2021 09:37:12 +0000   NodeStatusUnknown   Kubelet stopped posting node status.
+  PIDPressure          Unknown   Mon, 03 May 2021 09:33:58 +0000   Mon, 03 May 2021 09:37:12 +0000   NodeStatusUnknown   Kubelet stopped posting node status.
+  Ready                Unknown   Mon, 03 May 2021 09:33:58 +0000   Mon, 03 May 2021 09:37:12 +0000   NodeStatusUnknown   Kubelet stopped posting node status.
+Addresses:
+  InternalIP:  10.1.0.5
+  Hostname:    worker-02
+Capacity:
+  cpu:                2
+  ephemeral-storage:  30309264Ki
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             8153432Ki
+  pods:               110
+Allocatable:
+  cpu:                2
+  ephemeral-storage:  27933017657
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             8051032Ki
+  pods:               110
+System Info:
+  Machine ID:                 a045cfa9a8924b2fa7bcc4199471b66a
+  System UUID:                1532fe10-4907-d443-8b91-cdbd70b9e024
+  Boot ID:                    79c74ac3-58f1-4969-bb71-5775d920d852
+  Kernel Version:             5.4.0-1046-azure
+  OS Image:                   Ubuntu 18.04.5 LTS
+  Operating System:           linux
+  Architecture:               amd64
+  Container Runtime Version:  docker://20.10.2
+  Kubelet Version:            v1.21.0
+  Kube-Proxy Version:         v1.21.0
+Non-terminated Pods:          (2 in total)
+  Namespace                   Name                CPU Requests  CPU Limits  Memory Requests  Memory Limits  Age
+  ---------                   ----                ------------  ----------  ---------------  -------------  ---
+  kube-system                 kube-proxy-lr6pf    0 (0%)        0 (0%)      0 (0%)           0 (0%)         45h
+  kube-system                 weave-net-7wbwz     100m (5%)     0 (0%)      200Mi (2%)       0 (0%)         45h
+Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests    Limits
+  --------           --------    ------
+  cpu                100m (5%)   0 (0%)
+  memory             200Mi (2%)  0 (0%)
+  ephemeral-storage  0 (0%)      0 (0%)
+  hugepages-1Gi      0 (0%)      0 (0%)
+  hugepages-2Mi      0 (0%)      0 (0%)
+Events:
+  Type    Reason                   Age                From        Message
+  ----    ------                   ----               ----        -------
+  Normal  Starting                 22m                kubelet     Starting kubelet.
+  Normal  NodeAllocatableEnforced  22m                kubelet     Updated Node Allocatable limit across pods
+  Normal  NodeHasSufficientMemory  22m (x2 over 22m)  kubelet     Node worker-02 status is now: NodeHasSufficientMemory
+  Normal  NodeHasNoDiskPressure    22m (x2 over 22m)  kubelet     Node worker-02 status is now: NodeHasNoDiskPressure
+  Normal  NodeHasSufficientPID     22m (x2 over 22m)  kubelet     Node worker-02 status is now: NodeHasSufficientPID
+  Normal  NodeNotReady             22m                kubelet     Node worker-02 status is now: NodeNotReady
+  Normal  Starting                 22m                kube-proxy  Starting kube-proxy.
+  Normal  NodeReady                22m                kubelet     Node worker-02 status is now: NodeReady
+  
+  
+  
+root@master:~/Kubernetes# kubectl get events|grep worker-02
+56m         Normal    Scheduled                 pod/nginx-deployment-f77774fc5-b6246    Successfully assigned default/nginx-deployment-f77774fc5-b6246 to worker-02
+56m         Normal    Scheduled                 pod/nginx-deployment-f77774fc5-tlmx4    Successfully assigned default/nginx-deployment-f77774fc5-tlmx4 to worker-02
+20m         Normal    NodeNotReady              node/worker-02                          Node worker-02 status is now: NodeNotReady
+23m         Normal    Starting                  node/worker-02                          Starting kubelet.
+23m         Normal    NodeAllocatableEnforced   node/worker-02                          Updated Node Allocatable limit across pods
+23m         Normal    NodeHasSufficientMemory   node/worker-02                          Node worker-02 status is now: NodeHasSufficientMemory
+23m         Normal    NodeHasNoDiskPressure     node/worker-02                          Node worker-02 status is now: NodeHasNoDiskPressure
+23m         Normal    NodeHasSufficientPID      node/worker-02                          Node worker-02 status is now: NodeHasSufficientPID
+23m         Normal    NodeNotReady              node/worker-02                          Node worker-02 status is now: NodeNotReady
+23m         Normal    Starting                  node/worker-02                          Starting kube-proxy.
+23m         Normal    NodeReady                 node/worker-02                          Node worker-02 status is now: NodeReady
+
+
+
+root@worker-02:~# systemctl status kubelet |grep Active
+   Active: inactive (dead) since Mon 2021-05-03 09:36:38 UTC; 21min ago
+   
+root@worker-02:~# systemctl status docker |grep Active
+   Active: active (running) since Mon 2021-05-03 09:31:59 UTC; 26min ago
+
+root@worker-02:~# systemctl start kubelet
+
+root@worker-02:~# systemctl status docker |grep Active
+   Active: active (running) since Mon 2021-05-03 09:31:59 UTC; 26min ago
+   
+root@worker-02:~# systemctl status kubelet |grep Active
+   Active: active (running) since Mon 2021-05-03 09:58:32 UTC; 7s ago
+   
+   
+root@master:~/Kubernetes# kubectl get nodes
+NAME        STATUS   ROLES                  AGE   VERSION
+master      Ready    control-plane,master   45h   v1.21.0
+worker-01   Ready    <none>                 45h   v1.21.0
+worker-02   Ready    <none>                 45h   v1.21.0
+

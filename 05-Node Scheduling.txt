@@ -1,0 +1,100 @@
+root@master:~# kubectl get nodes --show-labels
+NAME        STATUS   ROLES                  AGE   VERSION   LABELS
+master      Ready    control-plane,master   28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=master,kubernetes.io/os=linux,node-role.kubernetes.io/control-plane=,node-role.kubernetes.io/master=,node.kubernetes.io/exclude-from-external-load-balancers=
+worker-01   Ready    <none>                 27h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-01,kubernetes.io/os=linux
+worker-02   Ready    <none>                 27h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-02,kubernetes.io/os=linux
+
+
+root@master:~# kubectl label nodes worker-01 disktype=ssd
+node/worker-01 labeled
+
+
+root@master:~# kubectl get nodes --show-labels
+NAME        STATUS   ROLES                  AGE   VERSION   LABELS
+master      Ready    control-plane,master   28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=master,kubernetes.io/os=linux,node-role.kubernetes.io/control-plane=,node-role.kubernetes.io/master=,node.kubernetes.io/exclude-from-external-load-balancers=
+worker-01   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,disktype=ssd,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-01,kubernetes.io/os=linux
+worker-02   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-02,kubernetes.io/os=linux
+
+
+root@master:~/Kubernetes# cat label-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.12
+        ports:
+        - containerPort: 80
+      nodeSelector:
+        disktype: ssd
+		
+		
+root@master:~/Kubernetes# kubectl create -f label-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-7d665c5545-h5245   1/1     Running   0          8s    10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-7d665c5545-qc746   1/1     Running   0          8s    10.32.0.4   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl label nodes worker-01 disktype-
+node/worker-01 labeled
+
+
+root@master:~/Kubernetes# kubectl get nodes --show-labels
+NAME        STATUS   ROLES                  AGE   VERSION   LABELS
+master      Ready    control-plane,master   28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=master,kubernetes.io/os=linux,node-role.kubernetes.io/control-plane=,node-role.kubernetes.io/master=,node.kubernetes.io/exclude-from-external-load-balancers=
+worker-01   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-01,kubernetes.io/os=linux
+worker-02   Ready    <none>                 28h   v1.21.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker-02,kubernetes.io/os=linux
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE    IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-7d665c5545-h5245   1/1     Running   0          117s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-7d665c5545-qc746   1/1     Running   0          117s   10.32.0.4   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl delete -f label-deployment.yaml
+deployment.apps "nginx-deployment" deleted
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS        RESTARTS   AGE     IP       NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-7d665c5545-qc746   0/1     Terminating   0          2m38s   <none>   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl create -f label-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+nginx-deployment-7d665c5545-7mjcq   0/1     Pending   0          3s    <none>   <none>   <none>           <none>
+nginx-deployment-7d665c5545-7pmld   0/1     Pending   0          3s    <none>   <none>   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl label nodes worker-01 disktype=ssd
+node/worker-01 labeled
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-7d665c5545-7mjcq   1/1     Running   0          81s   10.32.0.4   worker-01   <none>           <none>
+nginx-deployment-7d665c5545-7pmld   1/1     Running   0          81s   10.32.0.3   worker-01   <none>           <none>
+
+

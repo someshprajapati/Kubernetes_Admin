@@ -1,0 +1,114 @@
+root@master:~/Kubernetes# kubectl create -f metrics-server.yaml
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+serviceaccount/metrics-server created
+deployment.apps/metrics-server created
+service/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+
+
+root@master:~/Kubernetes# kubectl top nodes
+error: metrics not available yet
+
+
+root@master:~/Kubernetes# kubectl top nodes
+NAME        CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+master      124m         6%     1320Mi          16%
+worker-01   67m          3%     809Mi           10%
+worker-02   56m          2%     822Mi           10%
+
+
+root@master:~/Kubernetes# kubectl top pods
+NAME                               CPU(cores)   MEMORY(bytes)
+nginx-deployment-f77774fc5-59c7n   0m           2Mi
+nginx-deployment-f77774fc5-9z77v   0m           2Mi
+nginx-deployment-f77774fc5-gwcm9   0m           2Mi
+nginx-deployment-f77774fc5-pnll7   0m           2Mi
+nginx-deployment-f77774fc5-stkqp   0m           2Mi
+
+
+root@master:~/Kubernetes# kubectl create -f nginx-hpa.yaml
+deployment.apps/nginx-hpa created
+
+
+root@master:~/Kubernetes# kubectl get all
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/nginx-hpa-df4c75d8d-8kf8n   1/1     Running   0          2m11s
+pod/nginx-hpa-df4c75d8d-b779x   1/1     Running   0          2m11s
+
+NAME                       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+service/demo-pod           NodePort    10.99.229.40    <none>        80:30504/TCP   59m
+service/kubernetes         ClusterIP   10.96.0.1       <none>        443/TCP        24h
+service/nginx-deployment   ClusterIP   10.101.16.231   <none>        80/TCP         24m
+
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-hpa   2/2     2            2           2m11s
+
+NAME                                  DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-hpa-df4c75d8d   2         2         2       2m11s
+
+
+
+root@master:~/Kubernetes# kubectl top pods
+NAME                        CPU(cores)   MEMORY(bytes)
+nginx-hpa-df4c75d8d-8kf8n   0m           2Mi
+nginx-hpa-df4c75d8d-b779x   0m           2Mi
+
+
+root@master:~/Kubernetes# kubectl top nodes
+NAME        CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+master      137m         6%     1258Mi          16%
+worker-01   65m          3%     814Mi           10%
+worker-02   53m          2%     823Mi           10%
+
+
+root@master:~/Kubernetes# kubectl autoscale deployment nginx-hpa --cpu-percent=2 --min=1 --max=3
+horizontalpodautoscaler.autoscaling/nginx-hpa autoscaled
+
+
+root@master:~/Kubernetes# kubectl get hpa
+NAME        REFERENCE              TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+nginx-hpa   Deployment/nginx-hpa   <unknown>/2%   1         3         0          8s
+
+
+root@master:~/Kubernetes# kubectl get hpa
+NAME        REFERENCE              TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+nginx-hpa   Deployment/nginx-hpa   0%/2%     1         3         2          3m44s
+
+
+root@master:~# kubectl run -it --rm load-generator --image=busybox /bin/sh
+/ # while true; do wget -q -O- http://10.38.0.5; done
+^C
+Session ended, resume using 'kubectl attach load-generator -c load-generator -i -t' command when the pod is running
+pod "load-generator" deleted
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                        READY   STATUS    RESTARTS   AGE    IP          NODE        NOMINATED NODE   READINESS GATES
+load-generator              1/1     Running   0          2m8s   10.32.0.3   worker-01   <none>           <none>
+nginx-hpa-df4c75d8d-b779x   1/1     Running   0          11m    10.38.0.5   worker-02   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl top pods
+NAME                        CPU(cores)   MEMORY(bytes)
+load-generator              1m           0Mi
+nginx-hpa-df4c75d8d-b779x   0m           2Mi
+
+
+root@master:~/Kubernetes# kubectl get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+load-generator              1/1     Running   0          3m30s
+nginx-hpa-df4c75d8d-b779x   1/1     Running   0          12m
+nginx-hpa-df4c75d8d-d7wd4   1/1     Running   0          8s
+nginx-hpa-df4c75d8d-pff8m   1/1     Running   0          8s
+
+
+root@master:~/Kubernetes# kubectl get hpa
+NAME        REFERENCE              TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+nginx-hpa   Deployment/nginx-hpa   34%/2%    1         3         1          8m1s
+
+
+

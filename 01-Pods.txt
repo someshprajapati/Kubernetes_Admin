@@ -1,0 +1,160 @@
+root@master:~/Kubernetes# kubectl get nodes
+NAME        STATUS   ROLES                  AGE   VERSION
+master      Ready    control-plane,master   23h   v1.21.0
+worker-01   Ready    <none>                 22h   v1.21.0
+worker-02   Ready    <none>                 22h   v1.21.0
+
+
+root@master:~/Kubernetes# kubectl get pods
+No resources found in default namespace.
+
+
+root@master:~/Kubernetes# cat demo-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-pod
+  labels:
+    name: demo-pod
+spec:
+  containers:
+  - name: demo-container
+    image: nginx
+
+
+root@master:~/Kubernetes# kubectl create -f demo-pod.yaml
+pod/demo-pod created
+
+root@master:~/Kubernetes# kubectl get pods
+NAME       READY   STATUS              RESTARTS   AGE
+demo-pod   0/1     ContainerCreating   0          6s
+
+
+root@master:~/Kubernetes# kubectl get pods -w
+NAME       READY   STATUS    RESTARTS   AGE
+demo-pod   1/1     Running   0          13s
+
+root@master:~/Kubernetes# kubectl get pods
+NAME       READY   STATUS    RESTARTS   AGE
+demo-pod   1/1     Running   0          45s
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME       READY   STATUS    RESTARTS   AGE    IP          NODE        NOMINATED NODE   READINESS GATES
+demo-pod   1/1     Running   0          2m9s   10.38.0.2   worker-02   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl expose pod demo-pod --port 80 --target-port 80 --type ClusterIP
+service/demo-pod exposed
+
+
+root@master:~/Kubernetes# kubectl get svc
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+demo-pod     ClusterIP   10.99.229.40   <none>        80/TCP    5s
+kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP   23h
+
+
+root@master:~/Kubernetes# curl 10.99.229.40
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+
+root@master:~/Kubernetes# kubectl describe svc demo-pod
+Name:              demo-pod
+Namespace:         default
+Labels:            name=demo-pod
+Annotations:       <none>
+Selector:          name=demo-pod
+Type:              ClusterIP
+IP Family Policy:  SingleStack
+IP Families:       IPv4
+IP:                10.99.229.40
+IPs:               10.99.229.40
+Port:              <unset>  80/TCP
+TargetPort:        80/TCP
+Endpoints:         10.38.0.2:80
+Session Affinity:  None
+Events:            <none>
+
+
+root@master:~/Kubernetes# kubectl edit svc demo-pod
+service/demo-pod edited
+
+
+root@master:~/Kubernetes# kubectl get svc
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+demo-pod     NodePort    10.99.229.40   <none>        80:30504/TCP   5m58s
+kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        23h
+
+
+root@master:~/Kubernetes# kubectl describe svc demo-pod
+Name:                     demo-pod
+Namespace:                default
+Labels:                   name=demo-pod
+Annotations:              <none>
+Selector:                 name=demo-pod
+Type:                     NodePort
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.99.229.40
+IPs:                      10.99.229.40
+Port:                     <unset>  80/TCP
+TargetPort:               80/TCP
+NodePort:                 <unset>  30504/TCP
+Endpoints:                10.38.0.2:80
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+
+Pick the worker node public IP:
+-------------------------------
+root@master:~/Kubernetes# curl 104.214.53.90:30504
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+
+root@master:~/Kubernetes# kubectl delete -f demo-pod.yaml
+pod "demo-pod" deleted
+

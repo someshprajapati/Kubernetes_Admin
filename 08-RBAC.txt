@@ -1,0 +1,168 @@
+root@master:~/Kubernetes# kubectl config get-contexts
+CURRENT   NAME                          CLUSTER      AUTHINFO           NAMESPACE
+*         kubernetes-admin@kubernetes   kubernetes   kubernetes-admin
+
+
+root@master:~/Kubernetes# kubectl create ns development
+namespace/development created
+
+
+root@master:~/Kubernetes# kubectl get ns
+NAME              STATUS   AGE
+default           Active   29h
+development       Active   7s
+kube-node-lease   Active   29h
+kube-public       Active   29h
+kube-system       Active   29h
+
+
+root@master:~/Kubernetes# sudo useradd -s /bin/bash DevDan
+root@master:~/Kubernetes# sudo passwd DevDan
+Enter new UNIX password:
+Retype new UNIX password:
+passwd: password updated successfully
+
+
+root@master:~/Kubernetes# openssl genrsa -out DevDan.key 2048
+Generating RSA private key, 2048 bit long modulus (2 primes)
+...................................................................................................................................................+++++
+....................................................................+++++
+e is 65537 (0x010001)
+
+
+root@master:~/Kubernetes# openssl req -new -key DevDan.key -out DevDan.csr -subj "/CN=DevDan/O=development"
+Can't load /root/.rnd into RNG
+140331666162112:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/root/.rnd
+
+
+root@master:~/Kubernetes# ls -lrt|tail
+-rw-r--r-- 1 root root  341 May  2 11:03 apple.yaml
+-rw-r--r-- 1 root root  535 May  2 11:03 app.py
+-rw-r--r-- 1 root root  548 May  2 11:03 adapter-pod.yaml
+-rw-r--r-- 1 root root  552 May  2 11:03 adapter-configmap.yaml
+drwxr-xr-x 2 root root 4096 May  2 11:03 __pycache__
+-rw-r--r-- 1 root root  671 May  2 11:03 README.md
+-rw-r--r-- 1 root root  240 May  2 11:03 Dockerfile
+-rw-r--r-- 1 root root  244 May  2 14:29 nfs-pv.yaml
+-rw------- 1 root root 1679 May  2 17:30 DevDan.key
+-rw-r--r-- 1 root root  915 May  2 17:32 DevDan.csr
+
+
+root@master:~/Kubernetes# sudo openssl x509 -req -in DevDan.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out DevDan.crt -days 45
+Signature ok
+subject=CN = DevDan, O = development
+Getting CA Private Key
+
+
+root@master:~/Kubernetes# kubectl config set-credentials DevDan --client-certificate=DevDan.crt --client-key=DevDan.key
+User "DevDan" set.
+
+
+root@master:~/Kubernetes# ls -lrt|tail
+-rw-r--r-- 1 root root  535 May  2 11:03 app.py
+-rw-r--r-- 1 root root  548 May  2 11:03 adapter-pod.yaml
+-rw-r--r-- 1 root root  552 May  2 11:03 adapter-configmap.yaml
+drwxr-xr-x 2 root root 4096 May  2 11:03 __pycache__
+-rw-r--r-- 1 root root  671 May  2 11:03 README.md
+-rw-r--r-- 1 root root  240 May  2 11:03 Dockerfile
+-rw-r--r-- 1 root root  244 May  2 14:29 nfs-pv.yaml
+-rw------- 1 root root 1679 May  2 17:30 DevDan.key
+-rw-r--r-- 1 root root  915 May  2 17:32 DevDan.csr
+-rw-r--r-- 1 root root 1017 May  2 17:34 DevDan.crt
+
+
+root@master:~/Kubernetes# kubectl config set-context DevDan-context --cluster=kubernetes --namespace=development --user=DevDan
+Context "DevDan-context" created.
+
+
+root@master:~/Kubernetes# kubectl config get-contexts
+CURRENT   NAME                          CLUSTER      AUTHINFO           NAMESPACE
+          DevDan-context                kubernetes   DevDan             development
+*         kubernetes-admin@kubernetes   kubernetes   kubernetes-admin
+
+
+root@master:~/Kubernetes# kubectl --context=DevDan-context get pods
+Error from server (Forbidden): pods is forbidden: User "DevDan" cannot list resource "pods" in API group "" in the namespace "development"
+
+
+
+root@master:~/Kubernetes# cat role-dev.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  namespace: development
+  name: developer
+rules:
+- apiGroups: ["", "extensions", "apps"]
+  resources: ["deployments", "replicasets", "pods"]
+  verbs: ["list", "get", "watch", "create", "update", "patch", "delete"]
+
+
+root@master:~/Kubernetes# kubectl create -f role-dev.yaml
+Warning: rbac.authorization.k8s.io/v1beta1 Role is deprecated in v1.17+, unavailable in v1.22+; use rbac.authorization.k8s.io/v1 Role
+role.rbac.authorization.k8s.io/developer created
+
+
+root@master:~/Kubernetes# cat rolebind.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: developer-role-binding
+  namespace: development
+subjects:
+- kind: User
+  name: DevDan
+  apiGroup: ""
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: ""
+
+
+
+root@master:~/Kubernetes# kubectl create -f rolebind.yaml
+Warning: rbac.authorization.k8s.io/v1beta1 RoleBinding is deprecated in v1.17+, unavailable in v1.22+; use rbac.authorization.k8s.io/v1 RoleBinding
+rolebinding.rbac.authorization.k8s.io/developer-role-binding created
+
+
+root@master:~/Kubernetes# kubectl get roles
+No resources found in default namespace.
+
+root@master:~/Kubernetes# kubectl get roles -n development
+NAME        CREATED AT
+developer   2021-05-02T17:42:57Z
+
+
+root@master:~/Kubernetes# kubectl get rolebinding -n development
+NAME                     ROLE             AGE
+developer-role-binding   Role/developer   94s
+
+
+root@master:~/Kubernetes# kubectl --context=DevDan-context get pods
+No resources found in development namespace.
+
+root@master:~/Kubernetes# kubectl --context=DevDan-context run nginx --image=nginx
+pod/nginx created
+
+root@master:~/Kubernetes# kubectl --context=DevDan-context get pods
+NAME    READY   STATUS    RESTARTS   AGE
+nginx   1/1     Running   0          2s
+
+
+root@master:~/Kubernetes# kubectl delete pod nginx -n development
+pod "nginx" deleted
+
+root@master:~/Kubernetes#  kubectl delete -f rolebind.yaml
+Warning: rbac.authorization.k8s.io/v1beta1 RoleBinding is deprecated in v1.17+, unavailable in v1.22+; use rbac.authorization.k8s.io/v1 RoleBinding
+rolebinding.rbac.authorization.k8s.io "developer-role-binding" deleted
+
+root@master:~/Kubernetes# kubectl delete -f role-dev.yaml
+Warning: rbac.authorization.k8s.io/v1beta1 Role is deprecated in v1.17+, unavailable in v1.22+; use rbac.authorization.k8s.io/v1 Role
+role.rbac.authorization.k8s.io "developer" deleted
+
+root@master:~/Kubernetes# kubectl delete ns development
+namespace "development" deleted
+
+
+root@master:~/Kubernetes# kubectl --context=DevDan-context get pods
+Error from server (Forbidden): pods is forbidden: User "DevDan" cannot list resource "pods" in API group "" in the namespace "development"

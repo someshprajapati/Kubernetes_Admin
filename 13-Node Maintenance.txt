@@ -1,0 +1,144 @@
+root@master:~/Kubernetes# cat nginx-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.12
+        ports:
+        - containerPort: 80
+		
+		
+root@master:~/Kubernetes# kubectl create -f nginx-deployment.yaml
+deployment.apps/nginx-deployment created
+
+
+root@master:~/Kubernetes# kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   2/2     2            2           7s
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE   IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-d4gxd   1/1     Running   0          16s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-g64xw   1/1     Running   0          16s   10.32.0.3   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl scale --replicas=3 deployment nginx-deployment
+deployment.apps/nginx-deployment scaled
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE    IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-d4gxd   1/1     Running   0          2m8s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-g64xw   1/1     Running   0          2m8s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-krs87   1/1     Running   0          3s     10.38.0.3   worker-02   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl get nodes
+NAME        STATUS   ROLES                  AGE   VERSION
+master      Ready    control-plane,master   44h   v1.21.0
+worker-01   Ready    <none>                 44h   v1.21.0
+worker-02   Ready    <none>                 44h   v1.21.0
+
+
+root@master:~/Kubernetes# kubectl cordon worker-02
+node/worker-02 cordoned
+
+root@master:~/Kubernetes# kubectl get nodes
+NAME        STATUS                     ROLES                  AGE   VERSION
+master      Ready                      control-plane,master   44h   v1.21.0
+worker-01   Ready                      <none>                 44h   v1.21.0
+worker-02   Ready,SchedulingDisabled   <none>                 44h   v1.21.0
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-d4gxd   1/1     Running   0          4m26s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-g64xw   1/1     Running   0          4m26s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-krs87   1/1     Running   0          2m21s   10.38.0.3   worker-02   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl scale --replicas=5 deployment nginx-deployment
+deployment.apps/nginx-deployment scaled
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-d4gxd   1/1     Running   0          5m31s   10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-g64xw   1/1     Running   0          5m31s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-khmpx   1/1     Running   0          4s      10.32.0.5   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-krs87   1/1     Running   0          3m26s   10.38.0.3   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-z4hvd   1/1     Running   0          3s      10.32.0.4   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl drain worker-02
+node/worker-02 already cordoned
+error: unable to drain node "worker-02", aborting command...
+
+There are pending nodes to be drained:
+ worker-02
+error: cannot delete DaemonSet-managed Pods (use --ignore-daemonsets to ignore): kube-system/kube-proxy-lr6pf, kube-system/weave-net-7wbwz
+
+
+root@master:~/Kubernetes# kubectl drain --ignore-daemonsets worker-02
+node/worker-02 already cordoned
+WARNING: ignoring DaemonSet-managed Pods: kube-system/kube-proxy-lr6pf, kube-system/weave-net-7wbwz
+evicting pod kube-system/coredns-558bd4d5db-5jz7w
+evicting pod default/nginx-deployment-f77774fc5-krs87
+evicting pod default/nginx-deployment-f77774fc5-d4gxd
+pod/nginx-deployment-f77774fc5-krs87 evicted
+pod/nginx-deployment-f77774fc5-d4gxd evicted
+pod/coredns-558bd4d5db-5jz7w evicted
+node/worker-02 evicted
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-g64xw   1/1     Running   0          8m46s   10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-khmpx   1/1     Running   0          3m19s   10.32.0.5   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-lxrhj   1/1     Running   0          55s     10.32.0.8   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-p88sh   1/1     Running   0          55s     10.32.0.7   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-z4hvd   1/1     Running   0          3m18s   10.32.0.4   worker-01   <none>           <none>
+
+
+root@master:~/Kubernetes# kubectl uncordon worker-02
+node/worker-02 uncordoned
+
+
+root@master:~/Kubernetes# kubectl get nodes
+NAME        STATUS   ROLES                  AGE   VERSION
+master      Ready    control-plane,master   44h   v1.21.0
+worker-01   Ready    <none>                 44h   v1.21.0
+worker-02   Ready    <none>                 44h   v1.21.0
+
+
+root@master:~/Kubernetes# kubectl scale --replicas=7 deployment nginx-deployment
+deployment.apps/nginx-deployment scaled
+
+
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                               READY   STATUS    RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+nginx-deployment-f77774fc5-4z6lq   1/1     Running   0          5s      10.38.0.1   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-g64xw   1/1     Running   0          10m     10.32.0.3   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-khmpx   1/1     Running   0          5m32s   10.32.0.5   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-lxrhj   1/1     Running   0          3m8s    10.32.0.8   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-p88sh   1/1     Running   0          3m8s    10.32.0.7   worker-01   <none>           <none>
+nginx-deployment-f77774fc5-tmvj6   1/1     Running   0          5s      10.38.0.2   worker-02   <none>           <none>
+nginx-deployment-f77774fc5-z4hvd   1/1     Running   0          5m31s   10.32.0.4   worker-01   <none>           <none>
+
+
+
